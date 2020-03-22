@@ -1,44 +1,110 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const garphqlHttp = require('express-graphql');
-const {buildSchema} = require('graphql')
+require('dotenv').config();
+
+const express = require("express");
+const mongoose = require('mongoose');
+const bodyParser = require("body-parser");
+const garphqlHttp = require("express-graphql");
+const { buildSchema } = require("graphql");
+
+const Event = require('./models/event');
 
 const app = express();
 
-const PORT = 3000;
-
 app.use(bodyParser.json());
 
-app.use('/graphql' , garphqlHttp({
+app.use(
+  "/graphql",
+  garphqlHttp({
     schema: buildSchema(`
+    
+    type Event {
+        _id: ID!
+        title: String!
+        description: String!
+        price: Float!
+        date: String!
+    }
+
+
+    input EventInput {
+        title: String!
+        description: String!
+        price: Float!
+        date: String!
+    }
         
-        type RootQuery {
-            events: [String!]!
-        }
+    type RootQuery {
+        events: [Event!]!
+    }
 
-        type RootMutation {
-            createEvent(name: String): String
-        }
+    type RootMutation {
+         createEvent(eventInput: EventInput): Event
+    }
 
 
-       schema {
-           query: RootQuery
-           mutation: RootMutation
-        }
+    schema {
+        query: RootQuery
+        mutation: RootMutation
+    }
     
     `),
-    rootValue:{
-        events: () =>{
-            return ['Playing Football' , 'Studing' , 'All-Night Coding'];
-        },
-        createEvent:(args) =>{
-            const eventName = args.name;
-            return eventName
-        }
+    rootValue: {
+      events: () => {
+        return Event.find()
+        .then(events =>{
+           return events.map(event =>{
+            return { ...event._doc};
+            });
+        })
+        .catch(err =>{
+            throw err;
+        })
+      },
+      createEvent: args => {
+        const event = new Event({
+          title: args.eventInput.title,
+          description: args.eventInput.description,
+          price: +args.eventInput.price,
+          date: new Date(args.eventInput.date)
+        });
+        return event
+          .save()
+          .then(result => {
+            console.log(result);
+            return { ...result._doc, _id: result._doc._id.toString() };
+          })
+          .catch(err => {
+            console.log(err);
+            throw err;
+          });
+      }
     },
-    graphiql:true
-}));
+    graphiql: true
+  })
+);
 
-app.listen(PORT , (req , res) =>{
-    console.log(`server has successfull run on port ${PORT}`)
+const PORT = process.env.PORT || 3000 ; 
+
+app.listen(PORT, () =>{
+
+    console.log(`Server run on port ${PORT}`);
+}); 
+
+
+// ----------- DB Config -----------//
+
+mongoose.connect(process.env.MONGO_DB_URL, {
+    useNewUrlParser: true,
+    useCreateIndex: true, 
+    useUnifiedTopology:true
+}); 
+
+mongoose.connection.on('connected', ( ) => {
+    console.log('Connected to the database');
 });
+mongoose.connection.on('error', (err) => {
+    console.error(`Failed to connected to the database: ${err}`);
+});
+
+module.exports = app;
+
