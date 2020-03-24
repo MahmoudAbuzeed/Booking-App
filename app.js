@@ -9,13 +9,14 @@ const cors = require('cors');
 
 const graphQlSchema = require('./garphql/schema/index');
 const graphQlResolvers = require('./garphql/resolvers/index');
+const isAuth = require('./middleware/is-auth');
 
 const app = express();
 
 app.use(cors());
 app.use(bodyParser.json());
 
-
+app.use(isAuth);
 
 app.use(
   "/graphql",
